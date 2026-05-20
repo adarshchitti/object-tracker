@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import os
 import time
 
@@ -98,6 +103,9 @@ def render_processing(base_url: str) -> None:
 
         try:
             status_data = get_task_status(base_url, task_id)
+        except requests.exceptions.Timeout:
+            time.sleep(POLL_INTERVAL_SECONDS)
+            continue
         except ApiError as e:
             st.session_state.task_error = e.message
             return

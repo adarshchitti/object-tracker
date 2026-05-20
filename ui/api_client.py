@@ -61,7 +61,7 @@ def upload_video(
     return TaskHandle(task_id=body["task_id"], status=body["status"])
 
 
-def get_task_status(base_url: str, task_id: str, timeout: float = 5.0) -> dict:
+def get_task_status(base_url: str, task_id: str, timeout: float = 10.0) -> dict:
     """GET /tasks/{task_id}. Returns the parsed JSON.
 
     Raises ApiError on 4xx/5xx.
