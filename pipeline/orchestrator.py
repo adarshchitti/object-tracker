@@ -28,7 +28,7 @@ def process_video(
     task_id: str,
     video_path: str,
     stride: int = 5,
-    min_track_frames: int = 3,
+    min_track_frames: int = 5,
     motion_window: int = 5,
     motion_threshold_fraction: float = 0.02,
     interaction_proximity_fraction: float = 0.05,
@@ -67,12 +67,12 @@ def process_video(
 
 def _run_pipeline(
     video_path: str,
-    stride: int,
-    min_track_frames: int,
-    motion_window: int,
-    motion_threshold_fraction: float,
-    interaction_proximity_fraction: float,
-    interaction_min_run_length: int,
+    stride: int = 5,
+    min_track_frames: int = 5,
+    motion_window: int = 5,
+    motion_threshold_fraction: float = 0.02,
+    interaction_proximity_fraction: float = 0.05,
+    interaction_min_run_length: int = 3,
 ):
     """Open video, run models, return AnalysisResult.
 

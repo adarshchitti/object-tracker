@@ -33,12 +33,13 @@ def _det(
     track_id: int,
     class_name: str = "laptop",
     bbox: tuple = (0.0, 0.0, 100.0, 100.0),
+    confidence: float = 0.9,
 ) -> Detection:
     return Detection(
         track_id=track_id,
         class_id=63,
         class_name=class_name,
-        confidence=0.9,
+        confidence=confidence,
         bbox=bbox,
     )
 
@@ -276,3 +277,15 @@ def test_build_analysis_result_serializes_with_camelcase_aliases() -> None:
         obj = data["objectsDetected"][0]
         assert "class" in obj
         assert "class_" not in obj
+
+
+def test_video_metadata_serializes_camelcase() -> None:
+    per_frame = {i: [_det(1)] for i in range(10)}
+    result = build_analysis_result(METADATA, per_frame, {}, {}, min_track_frames=3)
+
+    data = json.loads(result.model_dump_json(by_alias=True))
+    vm = data["videoMetadata"]
+    assert "durationSeconds" in vm
+    assert "frameCount" in vm
+    assert "duration_seconds" not in vm
+    assert "frame_count" not in vm

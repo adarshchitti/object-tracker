@@ -145,7 +145,7 @@ def build_analysis_result(
     per_frame_objects: dict[int, list[Detection]],
     per_frame_hands: dict[int, list],
     interactions_by_object: dict[int, list[PipelineInteraction]],
-    min_track_frames: int = 3,
+    min_track_frames: int = 5,
     motion_window: int = 5,
     motion_threshold_fraction: float = 0.02,
 ) -> AnalysisResult:
@@ -168,6 +168,9 @@ def build_analysis_result(
     )
 
     centroid_trails = build_centroid_trails(per_frame_objects)
+    # Diagnostic data showed phantom tracks (e.g. car, bottle) at ~3 frames vs
+    # real tracks at 21+; threshold of 5 sits in the gap and confidence didn't
+    # separate the classes.
     centroid_trails, filtered_objects = filter_ephemeral_tracks(
         centroid_trails, per_frame_objects, min_track_frames
     )

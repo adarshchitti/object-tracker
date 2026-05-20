@@ -7,8 +7,10 @@ from pydantic import BaseModel, Field
 
 
 class VideoMetadata(BaseModel):
-    duration_seconds: float
-    frame_count: int
+    model_config = {"populate_by_name": True}
+
+    duration_seconds: float = Field(alias="durationSeconds")
+    frame_count: int = Field(alias="frameCount")
     width: int
     height: int
     fps: float
