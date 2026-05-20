@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual envs
+.venv/
+.uv/
+venv/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Storage / runtime artifacts
+storage/tasks/*
+!storage/tasks/.gitkeep
+*.db
+*.sqlite3
+
+# Video / model files
+*.mp4
+*.mov
+*.pt
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Streamlit
+.streamlit/
+
+
+.claude/
