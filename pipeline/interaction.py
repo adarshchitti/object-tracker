@@ -99,6 +99,37 @@ def find_single_person_id(per_frame_objects: dict[int, list[Detection]]) -> int 
     return max(counts, key=lambda k: counts[k])
 
 
+def per_frame_interaction_distances(
+    per_frame_hands: dict[int, list[HandObservation]],
+    per_frame_objects: dict[int, list[Detection]],
+) -> dict[int, dict[int, float]]:
+    """For every frame, compute the minimum distance from any hand wrist to
+    each non-person object's bbox.
+
+    Returns: frame_index -> {object_track_id -> min_distance_in_pixels}.
+
+    Person detections are excluded. Frames with no hands OR no non-person
+    objects are omitted from the result. Used downstream to identify peak-
+    interaction frames (smallest distance within an Interaction interval).
+    """
+    result: dict[int, dict[int, float]] = {}
+    for frame_index, hands in per_frame_hands.items():
+        if not hands:
+            continue
+        objects = per_frame_objects.get(frame_index, [])
+        non_person = [d for d in objects if d.class_name != "person"]
+        if not non_person:
+            continue
+        per_object: dict[int, float] = {}
+        for det in non_person:
+            min_d = min(
+                distance_point_to_bbox(hand.center, det.bbox) for hand in hands
+            )
+            per_object[det.track_id] = min_d
+        result[frame_index] = per_object
+    return result
+
+
 def detect_interactions(
     per_frame_hands: dict[int, list[HandObservation]],
     per_frame_objects: dict[int, list[Detection]],

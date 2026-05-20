@@ -222,6 +222,58 @@ def test_get_task_result_404_for_missing_task(client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# GET /tasks/{task_id}/keyframes/{filename}
+# ---------------------------------------------------------------------------
+
+
+def test_get_keyframe_returns_image(client, storage_root, db_session) -> None:
+    db_session.add(Task(id="kf1", status="completed", video_path="/fake.mp4"))
+    db_session.commit()
+    kf_dir = storage_root / "tasks" / "kf1" / "keyframes"
+    kf_dir.mkdir(parents=True)
+    fname = "obj2_motion_transition_frame50.jpg"
+    (kf_dir / fname).write_bytes(b"\xff\xd8\xff\xe0fakejpgbytes")
+
+    response = client.get(f"/tasks/kf1/keyframes/{fname}")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.content.startswith(b"\xff\xd8")
+
+
+def test_get_keyframe_404_for_missing_task(client) -> None:
+    response = client.get("/tasks/nope/keyframes/obj1_motion_transition_frame1.jpg")
+    assert response.status_code == 404
+
+
+def test_get_keyframe_404_for_missing_file(client, db_session) -> None:
+    db_session.add(Task(id="kf2", status="completed", video_path="/fake.mp4"))
+    db_session.commit()
+    response = client.get("/tasks/kf2/keyframes/obj1_motion_transition_frame1.jpg")
+    assert response.status_code == 404
+
+
+def test_get_keyframe_400_for_invalid_filename(client, db_session) -> None:
+    db_session.add(Task(id="kf3", status="completed", video_path="/fake.mp4"))
+    db_session.commit()
+
+    # Wrong shape (no obj prefix, wrong ext)
+    r = client.get("/tasks/kf3/keyframes/malicious.exe")
+    assert r.status_code == 400
+
+    # URL-encoded path traversal — the filename arrives as ../../etc/passwd
+    # which the regex rejects before any path operation.
+    r = client.get("/tasks/kf3/keyframes/..%2F..%2Fetc%2Fpasswd")
+    assert r.status_code in (400, 404)  # Starlette may normalize before route match
+
+
+def test_get_keyframe_400_for_non_jpg_extension(client, db_session) -> None:
+    db_session.add(Task(id="kf4", status="completed", video_path="/fake.mp4"))
+    db_session.commit()
+    r = client.get("/tasks/kf4/keyframes/obj1_motion_transition_frame1.png")
+    assert r.status_code == 400
+
+
 @pytest.mark.slow
 def test_full_upload_to_result_flow(tmp_path, monkeypatch) -> None:
     fixture = os.path.join(os.path.dirname(__file__), "fixtures", "sample_short.mp4")

@@ -9,6 +9,7 @@ from pipeline.interaction import (
     detect_interactions,
     distance_point_to_bbox,
     find_single_person_id,
+    per_frame_interaction_distances,
     per_frame_interactions,
 )
 
@@ -277,3 +278,60 @@ def test_detect_interactions_handles_missing_frames() -> None:
     # Frame 10: objects=[] → no interaction → run breaks at length 2 < 3
     result = detect_interactions(per_frame_hands, per_frame_objects, DIAG, PROX, min_run_length=3)
     assert isinstance(result, dict)  # no KeyError
+
+
+# ---------------------------------------------------------------------------
+# per_frame_interaction_distances
+# ---------------------------------------------------------------------------
+
+
+def _hand_at(point: tuple[float, float], frame_index: int = 0) -> HandObservation:
+    return HandObservation(
+        frame_index=frame_index,
+        bbox=(point[0] - 10, point[1] - 10, point[0] + 10, point[1] + 10),
+        center=point,
+        confidence=0.9,
+        handedness="Right",
+    )
+
+
+def test_per_frame_interaction_distances_basic() -> None:
+    # Hand at (100, 100); laptop bbox at (200, 200, 300, 300).
+    # Nearest corner is (200, 200). Distance = sqrt(100^2 + 100^2) ≈ 141.42.
+    laptop = Detection(
+        track_id=LAPTOP_ID, class_id=63, class_name="laptop",
+        confidence=0.9, bbox=(200.0, 200.0, 300.0, 300.0),
+    )
+    per_frame_hands = {0: [_hand_at((100.0, 100.0))]}
+    per_frame_objects = {0: [laptop]}
+
+    result = per_frame_interaction_distances(per_frame_hands, per_frame_objects)
+
+    assert 0 in result
+    assert LAPTOP_ID in result[0]
+    assert result[0][LAPTOP_ID] == pytest.approx(141.421356, rel=1e-4)
+
+
+def test_per_frame_interaction_distances_skips_person() -> None:
+    per_frame_hands = {0: [_hand_at((50.0, 50.0))]}
+    per_frame_objects = {0: [_person(), _laptop()]}
+
+    result = per_frame_interaction_distances(per_frame_hands, per_frame_objects)
+
+    assert PERSON_ID not in result[0]
+    assert LAPTOP_ID in result[0]
+
+
+def test_per_frame_interaction_distances_min_across_hands() -> None:
+    laptop = Detection(
+        track_id=LAPTOP_ID, class_id=63, class_name="laptop",
+        confidence=0.9, bbox=(0.0, 0.0, 100.0, 100.0),
+    )
+    far_hand = _hand_at((500.0, 500.0))   # distance to laptop corner ~ 565
+    close_hand = _hand_at((50.0, 50.0))   # inside bbox -> distance 0
+
+    result = per_frame_interaction_distances(
+        {0: [far_hand, close_hand]}, {0: [laptop]}
+    )
+
+    assert result[0][LAPTOP_ID] == pytest.approx(0.0)

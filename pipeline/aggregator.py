@@ -13,6 +13,7 @@ from pipeline.detector import Detection
 from pipeline.interaction import Interaction as PipelineInteraction
 from pipeline.motion import (
     CentroidObservation,
+    MotionInterval as PipelineMotionInterval,
     bbox_to_centroid,
     classify_motion,
 )
@@ -89,6 +90,31 @@ def resolve_class_name(
     return max(counts, key=lambda k: counts[k])
 
 
+def compute_motion_intervals_by_object(
+    centroid_trails: dict[int, list[CentroidObservation]],
+    frame_diagonal: float,
+    motion_window: int = 5,
+    motion_threshold_fraction: float = 0.02,
+) -> dict[int, list[PipelineMotionInterval]]:
+    """Run motion classification for every tracked object.
+
+    motion_threshold_fraction is multiplied by frame_diagonal inside
+    classify_motion to give a resolution-independent pixel threshold.
+
+    Shared by build_detected_objects (for the schema response) and the
+    orchestrator's keyframe extraction step (for motion-transition frames).
+    """
+    return {
+        track_id: classify_motion(
+            trail,
+            window=motion_window,
+            threshold_pixels=motion_threshold_fraction,
+            frame_diagonal=frame_diagonal,
+        )
+        for track_id, trail in centroid_trails.items()
+    }
+
+
 def build_detected_objects(
     centroid_trails: dict[int, list[CentroidObservation]],
     per_frame_objects: dict[int, list[Detection]],
@@ -99,21 +125,17 @@ def build_detected_objects(
 ) -> list[DetectedObject]:
     """Build list[DetectedObject] from centroid trails and interactions.
 
-    Sorted by track_id for stable output. motion_threshold_fraction is
-    multiplied by frame_diagonal to get the resolution-independent pixel
-    threshold passed to classify_motion.
+    Sorted by track_id for stable output.
     """
+    motion_intervals_by_object = compute_motion_intervals_by_object(
+        centroid_trails, frame_diagonal, motion_window, motion_threshold_fraction
+    )
+
     result: list[DetectedObject] = []
     for track_id in sorted(centroid_trails.keys()):
-        trail = centroid_trails[track_id]
         class_name = resolve_class_name(track_id, per_frame_objects)
 
-        motion_intervals = classify_motion(
-            trail,
-            window=motion_window,
-            threshold_pixels=motion_threshold_fraction,
-            frame_diagonal=frame_diagonal,
-        )
+        motion_intervals = motion_intervals_by_object.get(track_id, [])
         schema_motion = [
             SchemaMotionInterval(frame_range=iv.frame_range, state=iv.state)
             for iv in motion_intervals
@@ -145,6 +167,7 @@ def build_analysis_result(
     per_frame_objects: dict[int, list[Detection]],
     per_frame_hands: dict[int, list],
     interactions_by_object: dict[int, list[PipelineInteraction]],
+    keyframe_filenames: list[str] | None = None,
     min_track_frames: int = 5,
     motion_window: int = 5,
     motion_threshold_fraction: float = 0.02,
@@ -184,7 +207,10 @@ def build_analysis_result(
         motion_threshold_fraction=motion_threshold_fraction,
     )
 
-    return AnalysisResult(
+    result = AnalysisResult(
         video_metadata=video_metadata,
         objects_detected=objects_detected,
     )
+    if keyframe_filenames:
+        result.key_frames = keyframe_filenames
+    return result

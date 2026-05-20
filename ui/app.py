@@ -132,7 +132,7 @@ def render_processing(base_url: str) -> None:
         time.sleep(POLL_INTERVAL_SECONDS)
 
 
-def render_results() -> None:
+def render_results(base_url: str) -> None:
     result = st.session_state.task_result
     if not result:
         st.warning("No result available.")
@@ -162,6 +162,20 @@ def render_results() -> None:
     else:
         st.info("No objects detected in this video.")
 
+    keyframes = result.get("keyFrames") or []
+    if keyframes:
+        st.markdown("### Keyframes")
+        st.caption(
+            f"{len(keyframes)} extracted: motion transitions and "
+            "peak-interaction moments."
+        )
+        cols = st.columns(min(len(keyframes), 4))
+        task_id = st.session_state.task_id
+        for i, fname in enumerate(keyframes):
+            col = cols[i % 4]
+            url = f"{base_url.rstrip('/')}/tasks/{task_id}/keyframes/{fname}"
+            col.image(url, caption=fname, use_container_width=True)
+
     with st.expander("Raw JSON response"):
         st.json(result)
 
@@ -187,7 +201,7 @@ def main() -> None:
     if st.session_state.task_error:
         render_error()
     elif st.session_state.task_result is not None:
-        render_results()
+        render_results(base_url)
         if st.button("Analyze another video"):
             reset_task_state()
             st.rerun()

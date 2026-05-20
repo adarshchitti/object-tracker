@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import uuid
 
 from fastapi import (
@@ -13,6 +14,7 @@ from fastapi import (
     HTTPException,
     UploadFile,
 )
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from api import storage
@@ -24,6 +26,9 @@ from pipeline.orchestrator import process_video
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 _CHUNK_SIZE = 1024 * 1024  # 1 MB
+KEYFRAME_FILENAME_PATTERN = re.compile(
+    r"^obj\d+_[a-z_]+_(?:person\d+_)?frame\d+\.jpg$"
+)
 
 
 @router.post(
@@ -142,3 +147,31 @@ def get_task_result(task_id: str, db: Session = Depends(get_db)) -> AnalysisResu
         )
 
     return AnalysisResult.model_validate_json(task.result_json)
+
+
+@router.get(
+    "/{task_id}/keyframes/{filename}",
+    responses={
+        400: {"description": "Invalid filename"},
+        404: {"description": "Task or keyframe not found"},
+    },
+)
+def get_keyframe(
+    task_id: str,
+    filename: str,
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    """Stream a keyframe JPG. Filename must match the strict naming pattern;
+    rejected before any filesystem access to prevent path traversal."""
+    if not KEYFRAME_FILENAME_PATTERN.match(filename):
+        raise HTTPException(status_code=400, detail="Invalid keyframe filename")
+
+    task = db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+    path = storage.task_directory(task_id) / "keyframes" / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Keyframe not found")
+
+    return FileResponse(str(path), media_type="image/jpeg")

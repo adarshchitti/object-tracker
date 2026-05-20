@@ -289,3 +289,19 @@ def test_video_metadata_serializes_camelcase() -> None:
     assert "frameCount" in vm
     assert "duration_seconds" not in vm
     assert "frame_count" not in vm
+
+
+def test_build_analysis_result_includes_keyframe_filenames() -> None:
+    per_frame = {i: [_det(1)] for i in range(10)}
+    filenames = ["obj1_motion_transition_frame5.jpg", "obj1_peak_interaction_person2_frame8.jpg"]
+
+    result = build_analysis_result(
+        METADATA, per_frame, {}, {},
+        keyframe_filenames=filenames,
+        min_track_frames=3,
+    )
+
+    assert result.key_frames == filenames
+
+    data = json.loads(result.model_dump_json(by_alias=True))
+    assert data["keyFrames"] == filenames
