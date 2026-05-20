@@ -34,3 +34,7 @@ dev-dependencies = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (run with -m slow, skipped by default)",
+]
+addopts = "-m 'not slow'"
