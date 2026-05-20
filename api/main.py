@@ -6,10 +6,12 @@ from fastapi import FastAPI
 
 from api.db import init_db
 from api.routes import router
+from api.storage import ensure_storage_root
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ensure_storage_root()
     init_db()
     yield
 
